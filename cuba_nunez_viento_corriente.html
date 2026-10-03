@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CUBA Núñez - Monitor de Viento y Corriente</title>
+  <style>
+    :root {
+      --bg-color: #f8f9fa;
+      --card-bg: #ffffff;
+      --border-color: #111111;
+      --text-main: #000000;
+      --highlight-bg: #e2e8f0;
+      --rain-blue: #1e40af;
+      --current-blue: #0284c7;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+      background-color: #d1d5db;
+      color: var(--text-main);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 10px;
+    }
+
+    .epaper-frame {
+      background: var(--card-bg);
+      border: 3px solid var(--border-color);
+      border-radius: 8px;
+      width: 100%;
+      max-width: 980px;
+      padding: 12px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+    }
+
+    .header {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 2px solid var(--border-color);
+      padding-bottom: 8px;
+      margin-bottom: 8px;
+    }
+
+    .burgee { width: 50px; height: 35px; }
+
+    .title-box { text-align: center; }
+    .title-box h1 { font-size: 1.1rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; }
+    .title-box .subtitle { font-size: 0.95rem; font-weight: 700; color: #1e293b; margin-top: 2px; }
+
+    .current-widget {
+      border: 1.5px solid var(--border-color);
+      padding: 4px 8px;
+      border-radius: 4px;
+      text-align: center;
+      font-size: 0.8rem;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
+    .table-container { width: 100%; overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; text-align: center; font-size: 0.82rem; }
+    th, td { border: 1px solid var(--border-color); padding: 4px 2px; vertical-align: middle; }
+    th { background-color: #f1f5f9; font-weight: 800; font-size: 0.85rem; padding: 5px; }
+
+    .day-col {
+      width: 11%; font-weight: 700; background-color: #fafafa;
+      text-align: left; padding-left: 6px;
+    }
+    .day-col .date-sub { font-size: 0.7rem; color: #475569; font-weight: 500; }
+
+    .cell-box {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 2px; min-height: 44px;
+    }
+
+    .wind-row { display: flex; align-items: center; gap: 3px; font-weight: 800; font-size: 0.95rem; }
+    .arrow { display: inline-block; font-weight: 900; font-size: 1.1rem; }
+    .gust { font-size: 0.75rem; font-weight: 600; color: #334155; }
+    
+    .weather-row { 
+      display: flex; 
+      align-items: center; 
+      justify-content: center;
+      gap: 3px; 
+      font-size: 0.71rem; 
+      color: #1e293b; 
+      font-weight: 600;
+      flex-wrap: nowrap;
+    }
+    .rain-text { color: var(--rain-blue); font-weight: 800; }
+    .current-text { color: var(--current-blue); font-weight: 800; }
+
+    .good-wind { background-color: var(--highlight-bg); }
+    .land-wind { text-decoration: line-through; opacity: 0.55; }
+
+    .ventana-col { width: 12%; font-size: 0.75rem; font-weight: 700; background-color: #fafafa; padding: 4px; }
+
+    .footer {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-top: 8px; padding-top: 6px; border-top: 1.5px solid var(--border-color);
+      font-size: 0.7rem; font-weight: 600;
+    }
+    .legend { display: flex; gap: 8px; flex-wrap: wrap; }
+    .legend-item { display: flex; align-items: center; gap: 3px; }
+    .box-sample { display: inline-block; width: 12px; height: 12px; border: 1px solid #000; }
+  </style>
+</head>
+<body>
+
+<div class="epaper-frame">
+  <div class="header">
+    <!-- Gallardete CUBA SVG (Azul marino con cruz blanca y estrella roja) -->
+    <svg class="burgee" viewBox="0 0 100 60">
+      <polygon points="0,0 100,30 0,60" fill="#0c2340"/>
+      <line x1="0" y1="30" x2="100" y2="30" stroke="#ffffff" stroke-width="6"/>
+      <line x1="30" y1="0" x2="30" y2="60" stroke="#ffffff" stroke-width="6"/>
+      <polygon points="30,22 32,27 37,27 33,30 35,35 30,32 25,35 27,30 23,27 28,27" fill="#da291c"/>
+    </svg>
+
+    <div class="title-box">
+      <h1>CUBA NÚÑEZ · WINGFOIL</h1>
+      <div class="subtitle" id="windowSummary">Calculando mejor ventana...</div>
+    </div>
+    
+    <div class="current-widget" id="currentWidget">
+      <div>-- kt</div>
+      <div>--°C CUBA</div>
+    </div>
+  </div>
+
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th>Día</th><th>08h</th><th>10h</th><th>12h</th><th>14h</th><th>16h</th><th>18h</th><th>20h</th><th>Ventana</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody">
+        <tr><td colspan="9" style="padding:20px;">Cargando pronóstico y corriente...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="footer">
+    <div class="legend">
+      <div class="legend-item"><span class="box-sample" style="background:#e2e8f0;"></span> ≥14 kt (N a SSE)</div>
+      <div class="legend-item"><span style="text-decoration:line-through;">tachado</span>: fuera de N-SSE (de tierra)</div>
+      <div class="legend-item"><span class="rain-text">💧 azul</span>: lluvia</div>
+      <div class="legend-item"><span class="current-text">🌊 celeste</span>: corriente (kt) ↓bajante ↑creciente</div>
+    </div>
+    <div id="lastUpdate">Actualizando...</div>
+  </div>
+</div>
+
+<script>
+  // Coordenadas CUBA Sede Núñez
+  const LAT = -34.5417;
+  const LON = -58.4510;
+  const targetHours = [8, 10, 12, 14, 16, 18, 20];
+  const daysOfWeek = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+
+  function getWeatherIcon(code) {
+    if (code === 0) return '☀️';
+    if (code >= 1 && code <= 3) return '⛅';
+    if (code === 45 || code === 48) return '🌫️';
+    if (code >= 51 && code <= 67) return '🌧';
+    if (code >= 80 && code <= 82) return '🌧️';
+    if (code >= 95) return '⛈️';
+    return '☁️';
+  }
+
+  // Viento navegable en CUBA Núñez: Viene de Norte (0°) a SSE (158°)
+  function isWindFromRiver(deg) {
+    return (deg >= 0 && deg <= 158) || (deg >= 350);
+  }
+
+  // Estimación de Corriente de Marea para Núñez en Nudos (kt) + sentido
+  // En Núñez: Bajante (hacia el SE, ↓) / Creciente (hacia el NW, ↑)
+  function getEstimatedCurrent(dateObj, windSpeed, windDir) {
+    const epoch = new Date('2026-01-01T00:00:00Z').getTime();
+    const hoursSinceEpoch = (dateObj.getTime() - epoch) / 3600000;
+    
+    // La corriente máxima ocurre entre pleamar y bajamar (desfase ~3.1h con respecto al ciclo M2)
+    const currentPhase = (2 * Math.PI * (hoursSinceEpoch - 3.1)) / 12.42;
+    let baseSpeed = 0.9 * Math.sin(currentPhase); // Positivo = Bajante (SE), Negativo = Creciente (NW)
+
+    // Ajuste por viento en Núñez (Viento del SE empuja creciente, Viento del NW/W empuja bajante)
+    if (windSpeed && windDir !== undefined) {
+      const rad = (windDir * Math.PI) / 180;
+      // Componente del viento en el eje SE-NW (135°)
+      const windProjection = (windSpeed / 25) * Math.cos(rad - (135 * Math.PI / 180));
+      baseSpeed += windProjection * 0.3;
+    }
+
+    const absSpeed = Math.abs(baseSpeed).toFixed(1);
+    const directionIcon = baseSpeed >= 0 ? "↓" : "↑"; // ↓ Bajante (SE) / ↑ Creciente (NW)
+    return `${absSpeed}kt${directionIcon}`;
+  }
+
+  async function fetchForecast() {
+    const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&hourly=temperature_2m,precipitation_probability,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m&daily=temperature_2m_max,temperature_2m_min&wind_speed_unit=kn&timezone=America%2FArgentina%2FBuenos_Aires`;
+    const marineUrl = `https://marine-api.open-meteo.com/v1/marine?latitude=-34.60&longitude=-58.30&hourly=ocean_current_velocity,ocean_current_direction&timezone=America%2FArgentina%2FBuenos_Aires`;
+
+    try {
+      const [weatherRes, marineRes] = await Promise.all([
+        fetch(weatherUrl),
+        fetch(marineUrl).catch(() => null)
+      ]);
+      
+      const weatherData = await weatherRes.json();
+      let marineData = null;
+      if (marineRes && marineRes.ok) {
+        const json = await marineRes.json();
+        if (json && json.hourly && json.hourly.ocean_current_velocity) marineData = json;
+      }
+
+      renderDashboard(weatherData, marineData);
+    } catch (err) {
+      document.getElementById('windowSummary').innerText = 'Error de conexión';
+    }
+  }
+
+  function renderDashboard(data, marineData) {
+    const hourly = data.hourly;
+    const tableBody = document.getElementById('tableBody');
+    tableBody.innerHTML = '';
+
+    const dailyMap = {};
+    hourly.time.forEach((t, index) => {
+      const dateKey = t.split('T')[0];
+      const hour = parseInt(t.split('T')[1].split(':')[0], 10);
+      const [year, month, day] = dateKey.split('-').map(Number);
+
+      if (!dailyMap[dateKey]) {
+        dailyMap[dateKey] = { 
+          dateObj: new Date(year, month - 1, day), 
+          hours: {} 
+        };
+      }
+
+      if (targetHours.includes(hour)) {
+        const slotDateObj = new Date(year, month - 1, day, hour);
+        const windSpd = Math.round(hourly.wind_speed_10m[index]);
+        const windDirection = hourly.wind_direction_10m[index];
+
+        let currentVal = null;
+        if (marineData && marineData.hourly && marineData.hourly.ocean_current_velocity && marineData.hourly.ocean_current_velocity[index] !== null) {
+          const velMs = marineData.hourly.ocean_current_velocity[index];
+          const velKt = (velMs * 1.94384).toFixed(1);
+          const dirDeg = marineData.hourly.ocean_current_direction[index] || 135;
+          const isEbb = (dirDeg >= 45 && dirDeg <= 225);
+          currentVal = `${velKt}kt${isEbb ? '↓' : '↑'}`;
+        } else {
+          currentVal = getEstimatedCurrent(slotDateObj, windSpd, windDirection);
+        }
+
+        dailyMap[dateKey].hours[hour] = {
+          speed: windSpd,
+          gust: Math.round(hourly.wind_gusts_10m[index]),
+          dir: windDirection,
+          temp: Math.round(hourly.temperature_2m[index]),
+          rain: hourly.precipitation_probability[index],
+          code: hourly.weather_code[index],
+          current: currentVal
+        };
+      }
+    });
+
+    let bestWindowText = "Sin ventanas buenas (N a SSE)";
+    let maxGoodHours = 0;
+    const dayKeys = Object.keys(dailyMap).slice(0, 7);
+
+    dayKeys.forEach((dKey, dIdx) => {
+      const dayData = dailyMap[dKey];
+      const dayName = daysOfWeek[dayData.dateObj.getDay()];
+      const dayNum = dayData.dateObj.getDate();
+      const monthNum = dayData.dateObj.getMonth() + 1;
+      const tMin = Math.round(data.daily.temperature_2m_min[dIdx] || 10);
+      const tMax = Math.round(data.daily.temperature_2m_max[dIdx] || 20);
+
+      const tr = document.createElement('tr');
+      let html = `<td class="day-col">
+          <div>${dayName}</div>
+          <div class="date-sub">${dayNum}/${monthNum}</div>
+          <div class="date-sub">${tMin}°-${tMax}°</div>
+        </td>`;
+
+      let goodHoursCount = 0;
+      let windowStart = null;
+      let windowEnd = null;
+
+      targetHours.forEach(h => {
+        const slot = dayData.hours[h];
+        if (slot) {
+          const fromRiver = isWindFromRiver(slot.dir);
+          const isGood = (slot.speed >= 14 || slot.gust >= 18) && fromRiver;
+
+          if (isGood) {
+            goodHoursCount++;
+            if (windowStart === null) windowStart = h;
+            windowEnd = h;
+          }
+
+          const cellClass = [isGood ? 'good-wind' : '', !fromRiver ? 'land-wind' : ''].join(' ').trim();
+          const icon = getWeatherIcon(slot.code);
+          const rainHtml = slot.rain >= 20 ? `<span class="rain-text">💧${slot.rain}%</span>` : '';
+          const currentHtml = `<span class="current-text">🌊${slot.current}</span>`;
+
+          const flowDir = (slot.dir + 180) % 360;
+
+          html += `<td class="${cellClass}">
+              <div class="cell-box">
+                <div class="wind-row">
+                  <span class="arrow" style="transform: rotate(${flowDir}deg);">↑</span>
+                  <span>${slot.speed}</span><span class="gust">${slot.gust}</span>
+                </div>
+                <div class="weather-row">
+                  <span>${icon}${slot.temp}°</span> ${rainHtml} ${currentHtml}
+                </div>
+              </div>
+            </td>`;
+        } else {
+          html += `<td>-</td>`;
+        }
+      });
+
+      let windowLabel = "-";
+      if (goodHoursCount >= 2) {
+        windowLabel = `${windowStart}h - ${windowEnd + 2}h`;
+        if (goodHoursCount > maxGoodHours) {
+          maxGoodHours = goodHoursCount;
+          bestWindowText = `${dayName} ${dayNum}/${monthNum} de ${windowStart}h a ${windowEnd + 2}h`;
+        }
+      }
+
+      html += `<td class="ventana-col">${windowLabel}</td>`;
+      tr.innerHTML = html;
+      tableBody.appendChild(tr);
+    });
+
+    document.getElementById('windowSummary').innerText = maxGoodHours > 0 
+      ? `MEJOR VENTANA: ${bestWindowText.toUpperCase()}` : "SIN VENTANAS BUENAS (N A SSE) ESTA SEMANA";
+
+    const nowSpeed = Math.round(hourly.wind_speed_10m[0]);
+    const nowGust = Math.round(hourly.wind_gusts_10m[0]);
+    const nowTemp = Math.round(hourly.temperature_2m[0]);
+    const nowDir = hourly.wind_direction_10m[0];
+    const nowFlowDir = (nowDir + 180) % 360;
+
+    document.getElementById('currentWidget').innerHTML = `
+      <div style="font-weight:800;"><span style="display:inline-block; transform:rotate(${nowFlowDir}deg);">↑</span> ${nowSpeed} <span style="font-size:0.7em;">r${nowGust}</span> kt</div>
+      <div style="color:#475569;">${nowTemp}°C CUBA</div>
+    `;
+    const now = new Date();
+    document.getElementById('lastUpdate').innerText = `Open-Meteo · Actualizado ${now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}`;
+  }
+
+  fetchForecast();
+  setInterval(fetchForecast, 1800000);
+</script>
+</body>
+</html>
